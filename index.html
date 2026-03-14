@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>For Maru - Sword Duel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0a0a0a;
+            color: #e2e2e2;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+
+        /* Character Area */
+        .enemy-area {
+            position: relative;
+            width: 320px;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .enemy-sprite {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+            border: 4px solid #444;
+            border-radius: 24px;
+            position: relative;
+            box-shadow: 0 0 60px rgba(0,0,0,0.8);
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        /* Directional Indicators */
+        .indicator {
+            position: absolute;
+            font-size: 5rem;
+            font-weight: 900;
+            color: rgba(255,255,255,0.1);
+            transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 50;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .stance-active {
+            color: #fbbf24 !important;
+            opacity: 1 !important;
+            transform: scale(1.2);
+            filter: drop-shadow(0 0 15px rgba(251,191,36,0.8));
+        }
+
+        .attack-warning {
+            color: #ef4444 !important;
+            opacity: 1 !important;
+            transform: scale(1.4);
+            filter: drop-shadow(0 0 20px rgba(239,68,68,0.9));
+            animation: pulse 0.2s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1.3); }
+            to { transform: scale(1.5); }
+        }
+
+        #judgment-display {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4rem;
+            font-weight: 900;
+            z-index: 150;
+            pointer-events: none;
+            opacity: 0;
+            text-shadow: 0 0 20px rgba(255,255,255,0.5);
+        }
+
+        .judgement-anim {
+            animation: popIn 0.6s ease-out forwards;
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -40%) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            80% { transform: translate(-50%, -55%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -60%) scale(0.9); opacity: 0; }
+        }
+
+        .hit-flash {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 200;
+        }
+
+        .flash-red { animation: flashRed 0.3s ease-out; }
+        .flash-white { animation: flashWhite 0.2s ease-out; }
+
+        @keyframes flashRed { 0% { background: rgba(255,0,0,0.5); opacity: 1; } 100% { background: transparent; opacity: 0; } }
+        @keyframes flashWhite { 0% { background: rgba(255,255,255,0.8); opacity: 1; } 100% { background: transparent; opacity: 0; } }
+
+        .sword-icon {
+            width: 120px;
+            height: 240px;
+            fill: #ccc;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), fill 0.2s;
+        }
+
+        .stance-progress-container {
+            position: absolute;
+            width: 100px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+        }
+        .stance-progress-bar {
+            height: 100%;
+            background: #fbbf24;
+            width: 0%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container" id="game-ui">
+    <!-- Top UI -->
+    <div class="absolute top-8 w-full px-12 flex justify-between items-start z-50">
+        <div class="w-72">
+            <div class="flex justify-between items-end mb-1">
+                <span class="text-white font-black italic text-xl tracking-tighter">PLAYER</span>
+                <span id="player-hp-text" class="text-sm font-bold">100 / 100</span>
+            </div>
+            <div class="w-full h-4 bg-gray-900 rounded-full overflow-hidden border border-gray-700">
+                <div id="player-hp-bar" class="h-full bg-gradient-to-r from-green-600 to-emerald-400 transition-all duration-300 w-full"></div>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <h1 class="text-5xl font-black text-white tracking-tighter mb-1 italic">FOR MARU</h1>
+            <div id="game-status" class="text-yellow-500 font-bold text-lg uppercase tracking-widest">Awaiting Battle...</div>
+        </div>
+
+        <div class="w-72">
+            <div class="flex justify-between items-end mb-1">
+                <span id="enemy-hp-text" class="text-sm font-bold">100 / 100</span>
+                <span class="text-red-500 font-black italic text-xl tracking-tighter">ENEMY</span>
+            </div>
+            <div class="w-full h-4 bg-gray-900 rounded-full overflow-hidden border border-gray-700">
+                <div id="enemy-hp-bar" class="h-full bg-gradient-to-l from-red-700 to-orange-500 transition-all duration-300 w-full"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="judgment-display"></div>
+
+    <!-- Battle Zone -->
+    <div class="enemy-area" id="enemy-container">
+        <div id="indicator-UP" class="indicator top-0 -translate-y-full">↑</div>
+        <div id="indicator-LEFT" class="indicator left-0 -translate-x-[110%]">←</div>
+        <div id="indicator-RIGHT" class="indicator right-0 translate-x-[110%]">→</div>
+        <div id="indicator-STAB" class="indicator scale-150">⦿</div>
+        
+        <div class="enemy-sprite" id="enemy-visual">
+            <svg id="enemy-sword-svg" class="sword-icon" viewBox="0 0 100 200">
+                <rect x="45" y="10" width="10" height="150" rx="2" />
+                <rect x="25" y="140" width="50" height="8" rx="2" />
+                <rect x="44" y="148" width="12" height="30" rx="2" />
+                <circle cx="50" cy="183" r="7" />
+            </svg>
+            <div id="stance-loader" class="stance-progress-container">
+                <div id="stance-progress" class="stance-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls & Logs -->
+    <div class="absolute bottom-10 flex flex-col items-center gap-6 w-full max-w-4xl">
+        <div class="flex flex-col items-center gap-2">
+            <div id="delay-warning" class="text-yellow-500 font-black text-lg opacity-0 transition-opacity uppercase italic tracking-tighter">Changing Stance...</div>
+            <div class="text-xs text-gray-500 font-bold tracking-widest uppercase">W, A, D: Move Stance | Space: Parry/Start</div>
+        </div>
+
+        <div class="w-full h-24 bg-black/80 border border-gray-800 rounded-lg p-3 overflow-hidden flex flex-col shadow-2xl">
+            <div class="text-[9px] text-gray-600 font-bold uppercase mb-1 tracking-widest border-b border-gray-900 pb-1">Combat Records</div>
+            <div id="combat-log" class="text-[11px] space-y-1 overflow-y-auto flex-1 font-medium text-gray-400">
+                <div>준비가 완료되었습니다. [시작 버튼]이나 [스페이스바]를 눌러주세요.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="absolute inset-0 bg-black/80 z-[600] flex flex-col items-center justify-center backdrop-blur-sm">
+        <h2 class="text-6xl font-black text-white mb-4 italic tracking-tighter">READY TO FIGHT?</h2>
+        <p class="text-gray-400 mb-10 text-lg">스페이스바로 대결을 시작할 수 있습니다.</p>
+        <button id="start-btn" class="px-20 py-6 bg-red-600 text-white font-black text-2xl rounded-full hover:bg-red-500 transition-all transform hover:scale-110 active:scale-95 shadow-[0_0_30px_rgba(220,38,38,0.5)]">
+            대결 시작 (Space)
+        </button>
+    </div>
+
+    <div id="flash-overlay" class="hit-flash"></div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over" class="hidden absolute inset-0 bg-black/95 z-[700] flex flex-col items-center justify-center p-8 overflow-y-auto">
+        <h2 id="result-title" class="text-7xl font-black mb-4 italic tracking-tighter"></h2>
+        
+        <div class="w-full max-w-2xl bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-gray-400 font-bold uppercase text-sm tracking-widest">최종 전투 기록</h3>
+                <button id="copy-log-btn" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded transition-colors">기록 복사</button>
+            </div>
+            <textarea id="final-log-area" readonly class="w-full h-48 bg-black/50 border border-gray-800 rounded p-3 text-xs font-mono text-gray-300 focus:outline-none resize-none"></textarea>
+        </div>
+
+        <p class="text-gray-400 mb-6 font-bold">스페이스바를 눌러 다시 시작하세요.</p>
+        <button id="restart-btn" class="px-16 py-5 bg-white text-black font-black rounded-full hover:bg-gray-200 transition-all transform hover:scale-105 active:scale-95">다시 하기 (Space)</button>
+    </div>
+</div>
+
+<script>
+    const config = {
+        maxHp: 100,
+        lightDuration: 300,
+        heavyDuration: 600,
+        stabDuration: 600, 
+        parryWindow: 150, 
+        stanceDelay: 150,
+        feintShiftDelay: 100,
+        feintTriggerTime: 300 
+    };
+
+    let state = {
+        playerHp: 100,
+        enemyHp: 100,
+        currentStance: 'UP',
+        isChangingStance: false,
+        activeAttack: null,
+        isGameOver: false,
+        isStarted: false,
+        fullLog: [] // Store logs for final report
+    };
+
+    const el = {
+        playerHpBar: document.getElementById('player-hp-bar'),
+        playerHpText: document.getElementById('player-hp-text'),
+        enemyHpBar: document.getElementById('enemy-hp-bar'),
+        enemyHpText: document.getElementById('enemy-hp-text'),
+        enemyVisual: document.getElementById('enemy-visual'),
+        enemySword: document.getElementById('enemy-sword-svg'),
+        statusText: document.getElementById('game-status'),
+        combatLog: document.getElementById('combat-log'),
+        judgmentDisplay: document.getElementById('judgment-display'),
+        flashOverlay: document.getElementById('flash-overlay'),
+        gameOver: document.getElementById('game-over'),
+        resultTitle: document.getElementById('result-title'),
+        delayWarning: document.getElementById('delay-warning'),
+        startScreen: document.getElementById('start-screen'),
+        startBtn: document.getElementById('start-btn'),
+        restartBtn: document.getElementById('restart-btn'),
+        stanceLoader: document.getElementById('stance-loader'),
+        stanceProgress: document.getElementById('stance-progress'),
+        finalLogArea: document.getElementById('final-log-area'),
+        copyLogBtn: document.getElementById('copy-log-btn')
+    };
+
+    function showJudgment(text, colorClass) {
+        el.judgmentDisplay.innerText = text;
+        el.judgmentDisplay.className = `font-black italic ${colorClass} judgement-anim`;
+        const newEl = el.judgmentDisplay.cloneNode(true);
+        el.judgmentDisplay.parentNode.replaceChild(newEl, el.judgmentDisplay);
+        el.judgmentDisplay = newEl;
+    }
+
+    function addLog(msg, color = 'text-gray-400') {
+        const timestamp = new Date().toLocaleTimeString('ko-KR', { hour12: false, minute: '2-digit', second: '2-digit' });
+        const logEntry = `[${timestamp}] ${msg}`;
+        state.fullLog.push(logEntry); // Save to internal state
+
+        const div = document.createElement('div');
+        div.className = color;
+        div.innerText = `> ${msg}`;
+        el.combatLog.appendChild(div);
+        el.combatLog.scrollTop = el.combatLog.scrollHeight;
+    }
+
+    function updateHp() {
+        el.playerHpBar.style.width = `${state.playerHp}%`;
+        el.playerHpText.innerText = `${state.playerHp} / 100`;
+        el.enemyHpBar.style.width = `${state.enemyHp}%`;
+        el.enemyHpText.innerText = `${state.enemyHp} / 100`;
+        if (state.playerHp <= 0) endGame(false);
+        else if (state.enemyHp <= 0) endGame(true);
+    }
+
+    function endGame(win) {
+        state.isGameOver = true;
+        el.gameOver.classList.remove('hidden');
+        el.resultTitle.innerText = win ? 'VICTORY' : 'DEFEAT';
+        el.resultTitle.className = win ? 'text-7xl font-black mb-4 italic text-green-500 tracking-tighter' : 'text-7xl font-black mb-4 italic text-red-600 tracking-tighter';
+        
+        // Populate final log report
+        const resultText = win ? "=== 승리 리포트 ===" : "=== 패배 리포트 ===";
+        const finalContent = `${resultText}\n최종 체력: PLAYER(${state.playerHp}) vs ENEMY(${state.enemyHp})\n\n${state.fullLog.join('\n')}`;
+        el.finalLogArea.value = finalContent;
+    }
+
+    async function setStance(dir) {
+        if (!state.isStarted || state.isGameOver || state.currentStance === dir || state.isChangingStance) return;
+        
+        state.isChangingStance = true;
+        el.delayWarning.style.opacity = '1';
+        el.stanceLoader.style.display = 'block';
+        el.stanceProgress.style.transition = 'none';
+        el.stanceProgress.style.width = '0%';
+        
+        setTimeout(() => {
+            el.stanceProgress.style.transition = `width ${config.stanceDelay}ms linear`;
+            el.stanceProgress.style.width = '100%';
+        }, 10);
+        
+        await new Promise(r => setTimeout(r, config.stanceDelay));
+        
+        if (!state.isGameOver) {
+            state.currentStance = dir;
+            state.isChangingStance = false;
+            el.delayWarning.style.opacity = '0';
+            el.stanceLoader.style.display = 'none';
+            updateIndicatorStance();
+        }
+    }
+
+    function updateIndicatorStance() {
+        document.querySelectorAll('.indicator').forEach(ind => {
+            ind.classList.remove('stance-active');
+        });
+        const activeInd = document.getElementById(`indicator-${state.currentStance}`);
+        if (activeInd) activeInd.classList.add('stance-active');
+    }
+
+    window.addEventListener('keydown', (e) => {
+        const key = e.code;
+        if (key === 'Space') {
+            if (!state.isStarted) { startGame(); return; }
+            if (state.isGameOver) { location.reload(); return; }
+        }
+        if (!state.isStarted || state.isGameOver || e.repeat) return;
+        
+        if (key === 'KeyW') { checkParry('UP'); setStance('UP'); }
+        if (key === 'KeyA') { checkParry('LEFT'); setStance('LEFT'); }
+        if (key === 'KeyD') { checkParry('RIGHT'); setStance('RIGHT'); }
+        if (key === 'Space') { checkParry('STAB'); }
+    });
+
+    function checkParry(dir) {
+        if (!state.activeAttack || state.activeAttack.resolved) return;
+        const now = Date.now();
+        const timeToHit = state.activeAttack.hitTime - now;
+        if (dir === state.activeAttack.dir && timeToHit >= 0 && timeToHit <= config.parryWindow) {
+            resolveAttack('PARRY');
+        }
+    }
+
+    async function enemyBrain() {
+        while (!state.isGameOver) {
+            await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
+            if (state.isGameOver) break;
+            const directions = ['UP', 'LEFT', 'RIGHT'];
+            let dir = directions[Math.floor(Math.random() * 3)];
+            
+            if (Math.random() < 0.6) {
+                await executeAttack(dir, 'LIGHT', config.lightDuration);
+            } else {
+                await executeHeavyAttack(dir);
+            }
+        }
+    }
+
+    async function executeHeavyAttack(dir) {
+        showIndicator(dir, true); 
+        await new Promise(r => setTimeout(r, config.feintTriggerTime));
+        if (state.isGameOver) return;
+        
+        const branchRoll = Math.random();
+        if (branchRoll < 0.4) {
+            hideAttackIndicators();
+            addLog("강공격을 찌르기로 전환합니다!", "text-yellow-500 font-bold");
+            await new Promise(r => setTimeout(r, config.feintShiftDelay));
+            await executeAttack('STAB', 'STAB', config.stabDuration);
+        } else if (branchRoll < 0.7) {
+            hideAttackIndicators();
+            addLog("동작을 줄여 빠르게 휘두릅니다!", "text-yellow-500 font-bold");
+            await new Promise(r => setTimeout(r, config.feintShiftDelay));
+            await executeAttack(dir, 'LIGHT', config.lightDuration);
+        } else {
+            await executeAttack(dir, 'HEAVY', config.heavyDuration - config.feintTriggerTime);
+        }
+    }
+
+    async function executeAttack(dir, type, duration) {
+        showIndicator(dir, true); 
+        const hitTime = Date.now() + duration;
+        state.activeAttack = { dir, type, hitTime, resolved: false };
+        
+        const angles = { 'UP': 0, 'LEFT': -45, 'RIGHT': 45, 'STAB': 0 };
+        const stabAnim = dir === 'STAB' ? `translateY(-40px) scaleY(1.4)` : `rotate(${angles[dir]}deg) scale(1.1) translateY(-15px)`;
+        
+        el.enemySword.style.transform = stabAnim;
+        el.enemySword.style.fill = (type === 'HEAVY' || dir === 'STAB') ? '#ff4d4d' : '#fff';
+        
+        await new Promise(r => setTimeout(r, duration));
+        
+        if (!state.isGameOver && state.activeAttack && !state.activeAttack.resolved) {
+            if (dir !== 'STAB' && state.currentStance === dir) resolveAttack('BLOCK');
+            else resolveAttack('HIT');
+        }
+        
+        hideAttackIndicators();
+        el.enemySword.style.transform = `none`;
+        el.enemySword.style.fill = '#ccc';
+        state.activeAttack = null;
+    }
+
+    function showIndicator(dir, isEnemy) {
+        const ind = document.getElementById(`indicator-${dir}`);
+        if (ind && isEnemy) ind.classList.add('attack-warning');
+    }
+
+    function hideAttackIndicators() {
+        document.querySelectorAll('.indicator').forEach(i => i.classList.remove('attack-warning'));
+    }
+
+    function resolveAttack(result) {
+        if (!state.activeAttack || state.activeAttack.resolved) return;
+        state.activeAttack.resolved = true;
+        
+        const attack = state.activeAttack;
+        let pDmg = 0; let eDmg = 0; let msg = ""; let col = ""; let judgeText = ""; let judgeCol = "";
+        
+        if (result === 'PARRY') {
+            judgeCol = "text-green-500";
+            if (attack.type === 'STAB') { 
+                eDmg = 15; judgeText = "DEFLECT"; 
+                msg = `[흘리기] 적의 찌르기를 흘려보내고 ${eDmg} 피해를 입혔습니다!`;
+            } else if (attack.type === 'HEAVY') { 
+                eDmg = 20; judgeText = "HEAVY PARRY"; 
+                msg = `[반격 성공] 적의 강공격을 쳐내고 ${eDmg} 피해를 입혔습니다!`;
+            } else { 
+                eDmg = 10; judgeText = "LIGHT PARRY"; 
+                msg = `[반격 성공] 적에게 ${eDmg} 피해를 입혔습니다!`;
+            }
+            col = "text-green-400 font-bold"; 
+            flash(true);
+        } else if (result === 'BLOCK') {
+            if (attack.type === 'HEAVY') { 
+                pDmg = 5; judgeText = "GUARD BREAK"; judgeCol = "text-yellow-500";
+                msg = `[방패 파괴] 강공격을 막았지만 가드가 밀려 ${pDmg} 피해를 입었습니다!`;
+                col = "text-yellow-500 font-medium";
+            } else if (attack.dir === 'STAB') { 
+                pDmg = 0; judgeText = "EVADE"; judgeCol = "text-yellow-500";
+                msg = `[회피] 적의 찌르기를 간발의 차로 피했습니다.`;
+                col = "text-yellow-400";
+            } else { 
+                pDmg = 0; judgeText = "BLOCK"; judgeCol = "text-yellow-500"; 
+                msg = `[방어] 적의 공격을 무효화했습니다.`;
+                col = "text-yellow-400";
+            }
+        } else {
+            judgeCol = "text-red-600";
+            if (attack.type === 'STAB') pDmg = 20;
+            else if (attack.type === 'HEAVY') pDmg = 20;
+            else pDmg = 10;
+            judgeText = "HIT!";
+            msg = `[피격!] 적의 공격에 노출되어 HP가 ${pDmg} 감소했습니다!`; 
+            col = "text-red-500 font-black";
+            flash(false);
+        }
+        
+        state.playerHp = Math.max(0, state.playerHp - pDmg);
+        state.enemyHp = Math.max(0, state.enemyHp - eDmg);
+        updateHp();
+        addLog(msg, col);
+        showJudgment(judgeText, judgeCol);
+    }
+
+    function flash(isEnemy) {
+        el.flashOverlay.className = isEnemy ? 'hit-flash flash-white' : 'hit-flash flash-red';
+        if (isEnemy) {
+            el.enemyVisual.classList.add('flash-white');
+            setTimeout(() => el.enemyVisual.classList.remove('flash-white'), 200);
+        }
+    }
+
+    function startGame() {
+        if (state.isStarted) return;
+        state.isStarted = true;
+        el.startScreen.classList.add('hidden');
+        el.statusText.innerText = "Fight!";
+        state.fullLog = []; // Reset logs for new game
+        addLog("전투가 시작되었습니다!", "text-white font-bold");
+        updateIndicatorStance();
+        updateHp();
+        enemyBrain();
+    }
+
+    el.startBtn.addEventListener('click', startGame);
+    el.restartBtn.addEventListener('click', () => location.reload());
+    
+    el.copyLogBtn.addEventListener('click', () => {
+        el.finalLogArea.select();
+        document.execCommand('copy');
+        el.copyLogBtn.innerText = "복사 완료!";
+        setTimeout(() => el.copyLogBtn.innerText = "기록 복사", 2000);
+    });
+</script>
+</body>
+</html>
