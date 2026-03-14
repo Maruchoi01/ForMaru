@@ -217,10 +217,34 @@
     </div>
 
     <!-- Start Screen -->
-    <div id="start-screen" class="absolute inset-0 bg-black/80 z-[600] flex flex-col items-center justify-center backdrop-blur-sm">
-        <h2 class="text-6xl font-black text-white mb-4 italic tracking-tighter">READY TO FIGHT?</h2>
-        <p class="text-gray-400 mb-10 text-lg">엔터 키(Enter)로 대결을 시작할 수 있습니다.</p>
-        <button id="start-btn" class="px-20 py-6 bg-red-600 text-white font-black text-2xl rounded-full hover:bg-red-500 transition-all transform hover:scale-110 active:scale-95 shadow-[0_0_30px_rgba(220,38,38,0.5)]">
+    <div id="start-screen" class="absolute inset-0 bg-black/90 z-[600] flex flex-col items-center justify-center backdrop-blur-md">
+        <div class="text-center mb-12">
+            <h2 class="text-5xl font-black text-white italic tracking-tighter">상대와 대결할 준비가 되셨습니까?</h2>
+        </div>
+        
+        <!-- Manual Section -->
+        <div class="max-w-xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 mb-10 text-center space-y-4 shadow-2xl">
+            <h3 class="text-red-500 font-black italic tracking-widest uppercase text-sm mb-4">Battle Manual</h3>
+            <p class="text-gray-200 text-lg font-medium leading-relaxed">
+                검으로 공격하는 상대의 공격을 방어하세요.
+            </p>
+            <p class="text-gray-400 text-sm">
+                공격 방향에 따라 <span class="text-white border border-white/20 px-2 py-0.5 rounded bg-white/10">W</span>, <span class="text-white border border-white/20 px-2 py-0.5 rounded bg-white/10">A</span>, <span class="text-white border border-white/20 px-2 py-0.5 rounded bg-white/10">D</span> 키를 눌러 방어 자세를 취하세요.
+            </p>
+            <p class="text-gray-400 text-sm">
+                찌르기 공격에는 <span class="text-white border border-white/20 px-3 py-0.5 rounded bg-white/10 italic">Space</span> 키를 눌러 회피하세요.
+            </p>
+            <div class="pt-4 border-t border-white/5 space-y-2">
+                <p class="text-yellow-500 font-bold">
+                    상대의 공격이 맞기 직전에 방어하거나 회피했다면 반격할 수 있습니다.
+                </p>
+                <p class="text-red-500 font-black italic">
+                    반격만이 상대를 쓰러트릴 수 있습니다.
+                </p>
+            </div>
+        </div>
+
+        <button id="start-btn" class="px-24 py-6 bg-red-600 text-white font-black text-2xl rounded-full hover:bg-red-500 transition-all transform hover:scale-110 active:scale-95 shadow-[0_0_40px_rgba(220,38,38,0.4)]">
             대결 시작 (Enter)
         </button>
     </div>
@@ -377,7 +401,6 @@
     window.addEventListener('keydown', (e) => {
         const key = e.code;
         
-        // Handle Start and Restart with Enter
         if (key === 'Enter') {
             if (!state.isStarted) { startGame(); return; }
             if (state.isGameOver) { location.reload(); return; }
