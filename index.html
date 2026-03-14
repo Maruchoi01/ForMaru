@@ -204,14 +204,14 @@
     <!-- Controls & Logs -->
     <div class="absolute bottom-10 flex flex-col items-center gap-6 w-full max-w-4xl">
         <div class="flex flex-col items-center gap-2">
-            <div id="delay-warning" class="text-yellow-500 font-black text-lg opacity-0 transition-opacity uppercase italic tracking-tighter">Changing Stance...</div>
-            <div class="text-xs text-gray-500 font-bold tracking-widest uppercase">W, A, D: Move Stance | Space: Parry/Start</div>
+            <div id="delay-warning" class="text-yellow-500 font-black text-lg opacity-0 transition-opacity uppercase italic tracking-tighter">Action Delay...</div>
+            <div class="text-xs text-gray-500 font-bold tracking-widest uppercase">W, A, D: Move Stance | Space: Parry/Stab Deflect</div>
         </div>
 
         <div class="w-full h-24 bg-black/80 border border-gray-800 rounded-lg p-3 overflow-hidden flex flex-col shadow-2xl">
             <div class="text-[9px] text-gray-600 font-bold uppercase mb-1 tracking-widest border-b border-gray-900 pb-1">Combat Records</div>
             <div id="combat-log" class="text-[11px] space-y-1 overflow-y-auto flex-1 font-medium text-gray-400">
-                <div>준비가 완료되었습니다. [시작 버튼]이나 [스페이스바]를 눌러주세요.</div>
+                <div>준비가 완료되었습니다. [시작 버튼]이나 [엔터]를 눌러주세요.</div>
             </div>
         </div>
     </div>
@@ -219,9 +219,9 @@
     <!-- Start Screen -->
     <div id="start-screen" class="absolute inset-0 bg-black/80 z-[600] flex flex-col items-center justify-center backdrop-blur-sm">
         <h2 class="text-6xl font-black text-white mb-4 italic tracking-tighter">READY TO FIGHT?</h2>
-        <p class="text-gray-400 mb-10 text-lg">스페이스바로 대결을 시작할 수 있습니다.</p>
+        <p class="text-gray-400 mb-10 text-lg">엔터 키(Enter)로 대결을 시작할 수 있습니다.</p>
         <button id="start-btn" class="px-20 py-6 bg-red-600 text-white font-black text-2xl rounded-full hover:bg-red-500 transition-all transform hover:scale-110 active:scale-95 shadow-[0_0_30px_rgba(220,38,38,0.5)]">
-            대결 시작 (Space)
+            대결 시작 (Enter)
         </button>
     </div>
 
@@ -239,8 +239,8 @@
             <textarea id="final-log-area" readonly class="w-full h-48 bg-black/50 border border-gray-800 rounded p-3 text-xs font-mono text-gray-300 focus:outline-none resize-none"></textarea>
         </div>
 
-        <p class="text-gray-400 mb-6 font-bold">스페이스바를 눌러 다시 시작하세요.</p>
-        <button id="restart-btn" class="px-16 py-5 bg-white text-black font-black rounded-full hover:bg-gray-200 transition-all transform hover:scale-105 active:scale-95">다시 하기 (Space)</button>
+        <p class="text-gray-400 mb-6 font-bold">엔터 키(Enter)를 눌러 다시 시작하세요.</p>
+        <button id="restart-btn" class="px-16 py-5 bg-white text-black font-black rounded-full hover:bg-gray-200 transition-all transform hover:scale-105 active:scale-95">다시 하기 (Enter)</button>
     </div>
 </div>
 
@@ -249,9 +249,9 @@
         maxHp: 100,
         lightDuration: 300,
         heavyDuration: 600,
-        stabDuration: 600, 
-        parryWindow: 150, 
-        stanceDelay: 150,
+        stabDuration: 300, 
+        parryWindow: 300, 
+        inputDelay: 300,  
         feintShiftDelay: 100,
         feintTriggerTime: 300 
     };
@@ -260,11 +260,11 @@
         playerHp: 100,
         enemyHp: 100,
         currentStance: 'UP',
-        isChangingStance: false,
+        isActionLocked: false, 
         activeAttack: null,
         isGameOver: false,
         isStarted: false,
-        fullLog: [] // Store logs for final report
+        fullLog: []
     };
 
     const el = {
@@ -301,7 +301,7 @@
     function addLog(msg, color = 'text-gray-400') {
         const timestamp = new Date().toLocaleTimeString('ko-KR', { hour12: false, minute: '2-digit', second: '2-digit' });
         const logEntry = `[${timestamp}] ${msg}`;
-        state.fullLog.push(logEntry); // Save to internal state
+        state.fullLog.push(logEntry);
 
         const div = document.createElement('div');
         div.className = color;
@@ -325,35 +325,45 @@
         el.resultTitle.innerText = win ? 'VICTORY' : 'DEFEAT';
         el.resultTitle.className = win ? 'text-7xl font-black mb-4 italic text-green-500 tracking-tighter' : 'text-7xl font-black mb-4 italic text-red-600 tracking-tighter';
         
-        // Populate final log report
         const resultText = win ? "=== 승리 리포트 ===" : "=== 패배 리포트 ===";
         const finalContent = `${resultText}\n최종 체력: PLAYER(${state.playerHp}) vs ENEMY(${state.enemyHp})\n\n${state.fullLog.join('\n')}`;
         el.finalLogArea.value = finalContent;
     }
 
-    async function setStance(dir) {
-        if (!state.isStarted || state.isGameOver || state.currentStance === dir || state.isChangingStance) return;
-        
-        state.isChangingStance = true;
+    async function startActionDelay() {
+        state.isActionLocked = true;
         el.delayWarning.style.opacity = '1';
         el.stanceLoader.style.display = 'block';
         el.stanceProgress.style.transition = 'none';
         el.stanceProgress.style.width = '0%';
         
         setTimeout(() => {
-            el.stanceProgress.style.transition = `width ${config.stanceDelay}ms linear`;
+            el.stanceProgress.style.transition = `width ${config.inputDelay}ms linear`;
             el.stanceProgress.style.width = '100%';
         }, 10);
         
-        await new Promise(r => setTimeout(r, config.stanceDelay));
+        await new Promise(r => setTimeout(r, config.inputDelay));
         
-        if (!state.isGameOver) {
+        state.isActionLocked = false;
+        el.delayWarning.style.opacity = '0';
+        el.stanceLoader.style.display = 'none';
+    }
+
+    async function setStance(dir) {
+        if (!state.isStarted || state.isGameOver || state.isActionLocked) return;
+        
+        const isDirectionalInput = dir !== 'STAB';
+        const actionPromise = startActionDelay();
+        
+        if (isDirectionalInput) {
+            checkParry(dir);
             state.currentStance = dir;
-            state.isChangingStance = false;
-            el.delayWarning.style.opacity = '0';
-            el.stanceLoader.style.display = 'none';
             updateIndicatorStance();
+        } else {
+            checkParry('STAB');
         }
+
+        await actionPromise;
     }
 
     function updateIndicatorStance() {
@@ -366,22 +376,27 @@
 
     window.addEventListener('keydown', (e) => {
         const key = e.code;
-        if (key === 'Space') {
+        
+        // Handle Start and Restart with Enter
+        if (key === 'Enter') {
             if (!state.isStarted) { startGame(); return; }
             if (state.isGameOver) { location.reload(); return; }
         }
+
         if (!state.isStarted || state.isGameOver || e.repeat) return;
         
-        if (key === 'KeyW') { checkParry('UP'); setStance('UP'); }
-        if (key === 'KeyA') { checkParry('LEFT'); setStance('LEFT'); }
-        if (key === 'KeyD') { checkParry('RIGHT'); setStance('RIGHT'); }
-        if (key === 'Space') { checkParry('STAB'); }
+        if (key === 'KeyW') setStance('UP');
+        if (key === 'KeyA') setStance('LEFT');
+        if (key === 'KeyD') setStance('RIGHT');
+        if (key === 'Space') setStance('STAB');
     });
 
     function checkParry(dir) {
         if (!state.activeAttack || state.activeAttack.resolved) return;
+        
         const now = Date.now();
         const timeToHit = state.activeAttack.hitTime - now;
+        
         if (dir === state.activeAttack.dir && timeToHit >= 0 && timeToHit <= config.parryWindow) {
             resolveAttack('PARRY');
         }
@@ -482,10 +497,6 @@
                 pDmg = 5; judgeText = "GUARD BREAK"; judgeCol = "text-yellow-500";
                 msg = `[방패 파괴] 강공격을 막았지만 가드가 밀려 ${pDmg} 피해를 입었습니다!`;
                 col = "text-yellow-500 font-medium";
-            } else if (attack.dir === 'STAB') { 
-                pDmg = 0; judgeText = "EVADE"; judgeCol = "text-yellow-500";
-                msg = `[회피] 적의 찌르기를 간발의 차로 피했습니다.`;
-                col = "text-yellow-400";
             } else { 
                 pDmg = 0; judgeText = "BLOCK"; judgeCol = "text-yellow-500"; 
                 msg = `[방어] 적의 공격을 무효화했습니다.`;
@@ -522,7 +533,7 @@
         state.isStarted = true;
         el.startScreen.classList.add('hidden');
         el.statusText.innerText = "Fight!";
-        state.fullLog = []; // Reset logs for new game
+        state.fullLog = [];
         addLog("전투가 시작되었습니다!", "text-white font-bold");
         updateIndicatorStance();
         updateHp();
